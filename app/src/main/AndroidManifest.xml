@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <uses-feature
+        android:name="android.hardware.vr.headtracking"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.xr.input.hand_tracking"
+        android:required="false" />
+
+    <application
+        android:name=".app.InkDeskSpatialApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.InkDeskSpatial"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".app.LaunchActivity"
+            android:exported="true"
+            android:theme="@style/Theme.InkDeskSpatial">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Primary Center Volumetric/Planar Stage WindowContainer -->
+            <meta-data
+                android:name="pico.spatial.windowcontainer.id"
+                android:value="inkdesk_stage" />
+            <!-- 1: Planar with 3D SpatialView stage; companion wing panels open via SpatialNavigator -->
+            <meta-data
+                android:name="pico.spatial.windowcontainer.style"
+                android:value="1" />
+            <meta-data
+                android:name="pico.spatial.windowcontainer.defaultsize"
+                android:value="1080x760" />
+            <meta-data
+                android:name="pico.spatial.windowcontainer.resizetype"
+                android:value="2" />
+            <meta-data
+                android:name="pico.spatial.windowcontainer.worldscaletype"
+                android:value="1" />
+            <meta-data
+                android:name="pico.spatial.windowcontainer.materialbackground"
+                android:value="1" />
+        </activity>
+    </application>
+</manifest>

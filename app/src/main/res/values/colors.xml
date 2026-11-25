@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="titanium_glass_light">#EAE8E3</color>
+    <color name="titanium_card_light">#F4F3F0</color>
+    <color name="anodized_titanium_ink">#232220</color>
+    <color name="cinnabar_micro_accent">#D64527</color>
+    <color name="brushed_bronze_gold">#C98A3A</color>
+    <color name="kyoto_hinoki_wood">#C8A97E</color>
+    <color name="titanium_charcoal_dark">#171614</color>
+</resources>

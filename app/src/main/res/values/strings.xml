@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">砚境空间 · InkDesk Spatial</string>
+    <string name="window_stage_title">空间器物与榫卯拆解台</string>
+    <string name="window_audio_title">空间声景锚点与专注坞</string>
+    <string name="window_notes_title">空间手记与结构批注</string>
+</resources>

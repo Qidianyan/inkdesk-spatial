@@ -1,0 +1,3 @@
+-keep class com.elidot.inkdesk.model.** { *; }
+-keep class com.elidot.inkdesk.spatial.** { *; }
+-keep class com.pico.spatial.** { *; }

@@ -1,0 +1,18 @@
+# Gradle & Android Studio build outputs
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# Local standalone Kotlin domain test runner build output
+.kotlin-domain-test-build/
+
+# APK / AAB & signing artifacts
+*.apk
+*.aab
+*.ap_
+*.jks
+*.keystore
