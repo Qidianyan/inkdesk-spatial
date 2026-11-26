@@ -182,4 +182,39 @@ class MortiseAssemblyEngineTest {
         val radius = sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
         assertTrue(radius <= MortiseAssemblyEngine.MAX_STAGE_RADIUS_METERS + 1e-3f)
     }
+
+    @Test
+    fun clampsFloatOverflowCoordinatesWithoutReturningUnclampedVector() {
+        val clamped = MortiseAssemblyEngine.clampStagePosition(Vec3(1e20f, 1e20f, 1e20f))
+        assertTrue(MortiseAssemblyEngine.isValidVec3(clamped))
+        val radius = sqrt(clamped.x * clamped.x + clamped.y * clamped.y + clamped.z * clamped.z)
+        assertEquals(MortiseAssemblyEngine.MAX_STAGE_RADIUS_METERS, radius, 1e-3f)
+    }
+
+    @Test
+    fun sanitizesDoubleNaNCutawayFallbackToSafeDefault() {
+        val sanitized = engine.sanitizeCutawayState(
+            candidate = CutawayPlaneState(enabled = true, axis = CutawayAxis.Z, offsetMeters = Float.NaN),
+            fallback = CutawayPlaneState(enabled = false, axis = CutawayAxis.Y, offsetMeters = Float.NaN)
+        )
+        assertTrue(sanitized.offsetMeters.isFinite())
+        assertEquals(MortiseAssemblyEngine.DEFAULT_CUTAWAY_OFFSET, sanitized.offsetMeters, 1e-5f)
+    }
+
+    @Test
+    fun exposesCompleteAllApproachRatioAndDedicatedHintsAcrossAllExhibits() {
+        for (exhibit in ArtifactCatalog.exhibits) {
+            val session = engine.createSession(exhibit)
+            for (step in session.steps) {
+                assertFalse("Missing dedicated hint for ${step.partId}", step.guideHintZh.contains("对准铜金磁吸环"))
+            }
+            val firstId = session.steps.first().partId
+            assertEquals(0f, engine.computePartApproachRatio(session, firstId), 1e-4f)
+            val half = engine.setPartApproachRatio(session, firstId, 0.5f)
+            assertEquals(0.5f, engine.computePartApproachRatio(half, firstId), 2e-2f)
+            val full = engine.completeAll(session)
+            assertTrue(engine.progressOf(full).isComplete)
+            assertEquals(1f, engine.computePartApproachRatio(full, firstId), 1e-5f)
+        }
+    }
 }

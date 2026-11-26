@@ -475,6 +475,35 @@ class MortiseAssemblyEngine(
         )
     }
 
+    fun completeAll(state: MortiseAssemblyState): MortiseAssemblyState {
+        val parts = state.steps.associate { step ->
+            step.partId to AssemblyPartRuntime(
+                partId = step.partId,
+                order = step.order,
+                position = step.targetPosition,
+                yawDeg = 0f,
+                locked = true
+            )
+        }
+        return state.copy(
+            parts = parts,
+            lockedOrder = state.steps.map { it.partId },
+            activeStepIndex = state.steps.size,
+            lastEventMessageZh = "全部 ${state.steps.size} 件榫卯已一键合榫落位。"
+        )
+    }
+
+    fun computePartApproachRatio(state: MortiseAssemblyState, partId: String): Float {
+        val step = state.steps.firstOrNull { it.partId == partId } ?: return 0f
+        val runtime = state.parts[partId] ?: return 0f
+        if (runtime.locked) return 1f
+        val totalDist = step.stagedPosition.distanceTo(step.targetPosition)
+        if (!totalDist.isFinite() || totalDist <= 1e-5f) return 1f
+        val curDist = runtime.position.distanceTo(step.targetPosition)
+        if (!curDist.isFinite()) return 0f
+        return (1f - curDist / totalDist).coerceIn(0f, 1f)
+    }
+
     fun updateCutaway(
         state: MortiseAssemblyState,
         enabled: Boolean = state.cutaway.enabled,
@@ -508,10 +537,15 @@ class MortiseAssemblyEngine(
         candidate: CutawayPlaneState,
         fallback: CutawayPlaneState = CutawayPlaneState()
     ): CutawayPlaneState {
+        val safeFallback = if (fallback.offsetMeters.isFinite()) {
+            fallback.offsetMeters.coerceIn(CUTAWAY_MIN_OFFSET, CUTAWAY_MAX_OFFSET)
+        } else {
+            DEFAULT_CUTAWAY_OFFSET
+        }
         val safeOffset = if (candidate.offsetMeters.isFinite()) {
             candidate.offsetMeters.coerceIn(CUTAWAY_MIN_OFFSET, CUTAWAY_MAX_OFFSET)
         } else {
-            fallback.offsetMeters.coerceIn(CUTAWAY_MIN_OFFSET, CUTAWAY_MAX_OFFSET)
+            safeFallback
         }
         return candidate.copy(offsetMeters = safeOffset)
     }
@@ -550,12 +584,19 @@ class MortiseAssemblyEngine(
         }
 
         fun clampStagePosition(pos: Vec3): Vec3 {
-            val len = sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z)
-            if (!len.isFinite() || len <= MAX_STAGE_RADIUS_METERS || len <= 1e-6f) {
-                return pos
-            }
-            val scale = MAX_STAGE_RADIUS_METERS / len
-            return Vec3(pos.x * scale, pos.y * scale, pos.z * scale)
+            if (!isValidVec3(pos)) return Vec3.ZERO
+            val dx = pos.x.toDouble()
+            val dy = pos.y.toDouble()
+            val dz = pos.z.toDouble()
+            val maxAbs = maxOf(abs(dx), abs(dy), abs(dz))
+            if (maxAbs <= 1e-9) return pos
+            val nx = dx / maxAbs
+            val ny = dy / maxAbs
+            val nz = dz / maxAbs
+            val len = maxAbs * sqrt(nx * nx + ny * ny + nz * nz)
+            if (len <= MAX_STAGE_RADIUS_METERS.toDouble()) return pos
+            val scale = MAX_STAGE_RADIUS_METERS.toDouble() / len
+            return Vec3((dx * scale).toFloat(), (dy * scale).toFloat(), (dz * scale).toFloat())
         }
 
         private val ARTIFACT_STEP_ORDER: Map<String, List<String>> = mapOf(
@@ -572,7 +613,25 @@ class MortiseAssemblyEngine(
             "nidaogong" to "旋转泥道拱与华拱正交半榫咬合，锁定左右横系力。",
             "jiaohudou" to "落位交互斗与散斗垫群，分散拱端局部木纤维剪力。",
             "ang_lever" to "将朱漆下昂斜杠杆压入斗口，平衡屋檐外挑力矩。",
-            "shuatou" to "压入顶层耍头与承重枋，彻底锁死整攒斗拱竖向自由度。"
+            "shuatou" to "压入顶层耍头与承重枋，彻底锁死整攒斗拱竖向自由度。",
+            "dragon_base" to "先锚定四柱云龙十字底座，建立抗倾覆重心基准。",
+            "horizon_ring" to "水平安放二十四方位地平经环，校准天文基准水平面。",
+            "meridian_ring" to "直立嵌合子午双环，确立 39.9° 北极出地转轴。",
+            "equatorial_ring" to "正交装入赤道刻度环，映射二十八宿赤经坐标。",
+            "ecliptic_ring" to "按 23.5° 黄赤交角扣合朱铜黄道斜环。",
+            "sight_tube" to "装入四游仪窥管，完成三辰嵌套天文测星闭环。",
+            "cedar_stand" to "先安放紫檀海棠雕花座，隔热稳托铜炉本体。",
+            "tripod_feet" to "三乳鼎足呈等边三角对位落座，形成底部对流间隙。",
+            "censer_body" to "落位厚胎栗壳铜炉腹，构筑高热容蓄热腔体。",
+            "bridge_ears" to "对齐双桥耳热阻结构，完善对称持握轮廓。",
+            "incense_tray" to "轻置沉香篆印灰盘，保持草木灰微氧缓燃床面。",
+            "lotus_lid" to "合上十二瓣镂空莲盖，引导香烟缓升成柱。",
+            "octa_plinth" to "先固定八角须弥折面基座，分散塔身轴压。",
+            "tier1_shell" to "扣合初层交替山谷折面筒壳，提升薄壁抗屈曲刚度。",
+            "tier2_wings" to "嵌入中层竹绿菱形飞檐翼，构成环向加劲肋。",
+            "waist_rib" to "卡入朱砂腰檐力学锁环，箍紧上下两层折面壳体。",
+            "upper_dome" to "合拢顶层八瓣采光折穹，形成自承重灯笼空腔。",
+            "bronze_spire" to "插入鎏金相轮塔刹中轴，收束整塔竖向配重。"
         )
     }
 }

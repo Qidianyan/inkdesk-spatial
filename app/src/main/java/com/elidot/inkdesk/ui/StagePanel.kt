@@ -296,22 +296,54 @@ fun StagePanel(
 
                 Button(
                     onClick = {
-                        val nextEnabled = !assemblyState.cutaway.enabled
-                        val nextAxis = if (assemblyState.cutaway.enabled) {
-                            CutawayAxis.entries[(assemblyState.cutaway.axis.ordinal + 1) % CutawayAxis.entries.size]
-                        } else {
-                            assemblyState.cutaway.axis
-                        }
-                        viewModel.updateCutawayPlane(enabled = nextEnabled, axis = nextAxis)
+                        viewModel.updateCutawayPlane(enabled = !assemblyState.cutaway.enabled)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (assemblyState.cutaway.enabled) palette.bambooGreen else palette.cardSurface,
                         contentColor = if (assemblyState.cutaway.enabled) InkDeskThemeTokens.Alabaster else palette.primaryText
                     )
                 ) {
-                    Text(
-                        if (assemblyState.cutaway.enabled) "剖面 ${assemblyState.cutaway.axis.name}" else "剖面切片"
-                    )
+                    Text(if (assemblyState.cutaway.enabled) "关闭剖面" else "剖面切片")
+                }
+            }
+
+            if (assemblyState.cutaway.enabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CutawayAxis.entries.forEach { axis ->
+                        val activeAxis = assemblyState.cutaway.axis == axis
+                        Button(
+                            onClick = { viewModel.updateCutawayPlane(enabled = true, axis = axis) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (activeAxis) palette.persimmonAccent else palette.cardSurface,
+                                contentColor = if (activeAxis) InkDeskThemeTokens.Alabaster else palette.primaryText
+                            )
+                        ) {
+                            Text(axis.name)
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${assemblyState.cutaway.axis.labelZh}：${"%.2f".format(assemblyState.cutaway.offsetMeters)}m",
+                            fontSize = 12.sp,
+                            color = palette.secondaryText
+                        )
+                        Slider(
+                            value = assemblyState.cutaway.offsetMeters,
+                            valueRange = -0.85f..0.95f,
+                            onValueChange = { nextOffset ->
+                                viewModel.updateCutawayPlane(enabled = true, offsetMeters = nextOffset)
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = palette.champagneBronze,
+                                activeTrackColor = palette.champagneBronze,
+                                inactiveTrackColor = palette.borderStroke
+                            )
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))
