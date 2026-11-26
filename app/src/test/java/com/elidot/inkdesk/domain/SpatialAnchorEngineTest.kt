@@ -2,6 +2,7 @@ package com.elidot.inkdesk.domain
 
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.Vec3
+import com.elidot.inkdesk.spatial.SpatialSessionStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -191,5 +192,82 @@ class SpatialAnchorEngineTest {
         assertTrue(MortiseAssemblyEngine.isValidVec3(worldPin))
         assertTrue(snapped.state.cutaway.enabled)
         assertEquals(StudioLightingPreset.GALLERY_ZENITH, focus.state.lightingPreset)
+    }
+
+    @Test
+    fun sanitizesNaNAndOutOfBoundsCameraFocusAndProtectsBuiltInIds() {
+        val state = engine.createState(
+            activeArtifactId = "dougong_bell",
+            customAnchors = listOf(
+                SpatialCalloutAnchor(
+                    id = "pin_dougong_ludou",
+                    artifactId = "dougong_bell",
+                    partId = "ludou",
+                    localOffset = Vec3.ZERO,
+                    titleZh = "冒充内置",
+                    craftCategoryZh = "测试",
+                    eraOrPeriodZh = "测试",
+                    mechanicsSummaryZh = "应被拦截",
+                    craftDetailZh = "应被拦截",
+                    tone = CalloutPinTone.CINNABAR,
+                    cameraFocus = CameraFocusTarget(Float.NaN, 9f, -1f),
+                    isCustom = true,
+                    createdAtIso = "2026-11-26T00:00:00+08:00"
+                ),
+                SpatialCalloutAnchor(
+                    id = "pin_custom_dougong_bell_1",
+                    artifactId = "dougong_bell",
+                    partId = "ludou",
+                    localOffset = Vec3(0.2f, 0.2f, 0.2f),
+                    titleZh = "预载自定义钉",
+                    craftCategoryZh = "自定义空间钉",
+                    eraOrPeriodZh = "现场研学批注",
+                    mechanicsSummaryZh = "测试冲突跳过",
+                    craftDetailZh = "测试预载 ID 碰撞保护与焦距兜底。",
+                    tone = CalloutPinTone.BRONZE,
+                    cameraFocus = CameraFocusTarget(Float.NaN, 8f, -2f),
+                    isCustom = true,
+                    createdAtIso = "2026-11-26T00:00:00+08:00"
+                )
+            )
+        )
+        assertEquals(5, engine.anchorsFor(state, "dougong_bell").size)
+        val preloaded = engine.anchorsFor(state, "dougong_bell").first { it.id == "pin_custom_dougong_bell_1" }
+        assertTrue(preloaded.cameraFocus.yawRad.isFinite())
+        assertTrue(preloaded.cameraFocus.zoom in 2.4f..5.2f)
+
+        val added = engine.addCustomAnchor(
+            state = state,
+            artifactId = "dougong_bell",
+            partId = "ang_lever",
+            titleZh = "新增防撞号",
+            craftDetailZh = "不应与预载 pin_custom_dougong_bell_1 重号。",
+            cameraFocus = CameraFocusTarget(0.5f, 9f, 0.2f)
+        )
+        assertTrue(added.ok)
+        assertFalse(added.anchor!!.id == "pin_custom_dougong_bell_1")
+        assertEquals(1.0f, added.anchor!!.cameraFocus.pitchRad, 1e-5f)
+        assertEquals(2.4f, added.anchor!!.cameraFocus.zoom, 1e-5f)
+    }
+
+    @Test
+    fun fallsBackOnInvalidLightRadiusAndExportsAnchorsInMarkdownReport() {
+        for (badRadius in listOf(0f, -4f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            val dir = engine.directionalLightVector(StudioLightingPreset.WARM_LANTERN, badRadius)
+            val len = sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z)
+            assertEquals(5.8f, len, 1e-3f)
+            assertTrue(dir.y > 0f)
+        }
+
+        val store = SpatialSessionStore()
+        val anchorsState = engine.setLightingPreset(engine.createState("dougong_bell"), StudioLightingPreset.WARM_LANTERN)
+        val report = store.exportMarkdownReport(
+            lightingPreset = anchorsState.lightingPreset,
+            calloutAnchors = engine.anchorsFor(anchorsState, "dougong_bell")
+        )
+        assertTrue(report.contains("宋代烛映"))
+        assertTrue(report.contains("2450K"))
+        assertTrue(report.contains("3D 空间批注锚点（共 4 枚）"))
+        assertTrue(report.contains("象鼻下昂斜杠杆"))
     }
 }

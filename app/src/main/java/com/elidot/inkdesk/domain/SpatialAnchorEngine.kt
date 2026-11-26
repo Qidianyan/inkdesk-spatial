@@ -150,12 +150,16 @@ class SpatialAnchorEngine {
             grouped.getOrPut(pin.artifactId) { mutableListOf() }.add(pin)
         }
         for (custom in customAnchors) {
+            val cleanId = custom.id.trim()
+            if (cleanId.isEmpty() || cleanId in BUILTIN_ANCHOR_IDS) continue
             if (custom.artifactId.isBlank() || custom.partId.isBlank() || custom.titleZh.isBlank()) continue
             val bucket = grouped.getOrPut(custom.artifactId) { mutableListOf() }
-            if (bucket.any { it.id == custom.id }) continue
+            if (bucket.any { it.id == cleanId }) continue
             bucket.add(
                 custom.copy(
+                    id = cleanId,
                     localOffset = sanitizeLocalOffset(custom.localOffset),
+                    cameraFocus = sanitizeCameraFocus(custom.cameraFocus),
                     isCustom = true
                 )
             )
@@ -237,16 +241,25 @@ class SpatialAnchorEngine {
 
         val existing = state.anchorsByArtifact[artifactId].orEmpty()
         val customCount = existing.count { it.isCustom }
-        customSeq += 1
+        var candidateId: String
+        do {
+            customSeq += 1
+            candidateId = "pin_custom_${artifactId}_$customSeq"
+        } while (existing.any { it.id == candidateId } || candidateId in BUILTIN_ANCHOR_IDS)
         val defaultOffset = Vec3(
             x = (if (customCount % 2 == 0) 1f else -1f) * (0.26f + (customCount % 3) * 0.08f),
             y = 0.22f + (customCount % 3) * 0.07f,
             z = 0.24f
         )
+        val defaultFocus = CameraFocusTarget(
+            yawRad = (if (customCount % 2 == 0) 1f else -1f) * 0.62f,
+            pitchRad = 0.26f,
+            zoom = 3.45f
+        )
         val safeTitle = cleanTitle.take(MAX_TITLE_LENGTH)
         val safeDetail = cleanDetail.take(MAX_DETAIL_LENGTH)
         val anchor = SpatialCalloutAnchor(
-            id = "pin_custom_${artifactId}_$customSeq",
+            id = candidateId,
             artifactId = artifactId,
             partId = partId,
             localOffset = sanitizeLocalOffset(localOffset ?: defaultOffset),
@@ -256,11 +269,7 @@ class SpatialAnchorEngine {
             mechanicsSummaryZh = safeDetail.take(64),
             craftDetailZh = safeDetail,
             tone = tone,
-            cameraFocus = cameraFocus ?: CameraFocusTarget(
-                yawRad = (if (customCount % 2 == 0) 1f else -1f) * 0.62f,
-                pitchRad = 0.26f,
-                zoom = 3.45f
-            ),
+            cameraFocus = sanitizeCameraFocus(cameraFocus, defaultFocus),
             isCustom = true,
             createdAtIso = nowIso
         )
@@ -324,6 +333,20 @@ class SpatialAnchorEngine {
     fun resolveWorldPosition(anchor: SpatialCalloutAnchor, partLivePosition: Vec3): Vec3 {
         val safePart = if (MortiseAssemblyEngine.isValidVec3(partLivePosition)) partLivePosition else Vec3.ZERO
         return safePart + sanitizeLocalOffset(anchor.localOffset)
+    }
+
+    fun sanitizeCameraFocus(
+        focus: CameraFocusTarget?,
+        fallback: CameraFocusTarget = CameraFocusTarget(0.56f, 0.25f, 3.5f)
+    ): CameraFocusTarget {
+        if (focus == null || !focus.yawRad.isFinite() || !focus.pitchRad.isFinite() || !focus.zoom.isFinite()) {
+            return fallback
+        }
+        return CameraFocusTarget(
+            yawRad = focus.yawRad,
+            pitchRad = focus.pitchRad.coerceIn(-1.0f, 1.0f),
+            zoom = focus.zoom.coerceIn(2.4f, 5.2f)
+        )
     }
 
     fun sanitizeLocalOffset(offset: Vec3): Vec3 {
@@ -588,5 +611,7 @@ class SpatialAnchorEngine {
                 createdAtIso = "2026-11-25T09:00:00+08:00"
             )
         )
+
+        val BUILTIN_ANCHOR_IDS: Set<String> = BUILTIN_CALLOUT_ANCHORS.map { it.id }.toSet()
     }
 }

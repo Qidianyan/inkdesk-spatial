@@ -1,5 +1,7 @@
 package com.elidot.inkdesk.spatial
 
+import com.elidot.inkdesk.domain.SpatialCalloutAnchor
+import com.elidot.inkdesk.domain.StudioLightingPreset
 import com.elidot.inkdesk.model.AmbientLightingTheme
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.FocusTimerState
@@ -223,7 +225,10 @@ class SpatialSessionStore(
         }
     }
 
-    fun exportMarkdownReport(): String {
+    fun exportMarkdownReport(
+        lightingPreset: StudioLightingPreset = StudioLightingPreset.KYOTO_MORNING,
+        calloutAnchors: List<SpatialCalloutAnchor> = emptyList()
+    ): String {
         val artifact = ArtifactCatalog.findArtifact(state.activeArtifactId)
         val selectedPart = ArtifactCatalog.findPart(artifact.id, state.selectedPartId)
         val artifactNotes = state.notes.filter { it.artifactId == artifact.id }
@@ -237,7 +242,7 @@ class SpatialSessionStore(
             appendLine()
             appendLine("- **英文名称**：${artifact.titleEn}")
             appendLine("- **年代与制式**：${artifact.eraZh}")
-            appendLine("- **当前空间布局**：${state.layoutPreset.labelZh} | 环境光：${state.ambientTheme.labelZh}（${state.ambientTheme.kelvin}K）")
+            appendLine("- **当前空间布局**：${state.layoutPreset.labelZh} | 环境光：${state.ambientTheme.labelZh}（${state.ambientTheme.kelvin}K） | 展台影棚：${lightingPreset.labelZh}（${lightingPreset.kelvin}K）")
             appendLine("- **拆解进度**：${(state.explodeProgress * 100).toInt()}% | 剖面模式：${if (state.crossSectionEnabled) "开启" else "关闭"}")
             appendLine("- **专注计时**：已累计完成 ${state.focusTimer.completedSessions} 个番茄钟（当前剩余 ${state.focusTimer.formattedClock()}）")
             appendLine()
@@ -253,6 +258,14 @@ class SpatialSessionStore(
             }
             appendLine("- **力学原理**：${selectedPart.mechanicsPrinciple}")
             appendLine("- **历史注记**：${selectedPart.historicalNote}")
+            if (calloutAnchors.isNotEmpty()) {
+                appendLine()
+                appendLine("## 3D 空间批注锚点（共 ${calloutAnchors.size} 枚）")
+                calloutAnchors.forEach { pin ->
+                    val tag = if (pin.isCustom) "[自定义空间钉] " else "[${pin.craftCategoryZh}] "
+                    appendLine("- ${tag}**${pin.titleZh}**（${pin.eraOrPeriodZh}）：${pin.craftDetailZh}")
+                }
+            }
             appendLine()
             appendLine("## 空间声景锚点配置")
             if (activeSounds.isEmpty()) {

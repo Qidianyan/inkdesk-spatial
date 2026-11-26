@@ -69,7 +69,11 @@ class InkDeskViewModel(
     val assemblyState: StateFlow<MortiseAssemblyState> = _assemblyState.asStateFlow()
 
     private val _anchorState = MutableStateFlow(
-        anchorEngine.createState(store.state.activeArtifactId)
+        anchorEngine.syncSelectedAnchorToPart(
+            anchorEngine.createState(store.state.activeArtifactId),
+            store.state.activeArtifactId,
+            store.state.selectedPartId
+        )
     )
     val anchorState: StateFlow<SpatialAnchorState> = _anchorState.asStateFlow()
 
@@ -139,7 +143,7 @@ class InkDeskViewModel(
     fun setAssemblyMode(enabled: Boolean) {
         _assemblyMode.value = enabled
         if (enabled) {
-            assemblyProgress().activePartId?.let { store.selectPart(it) }
+            assemblyProgress().activePartId?.let { selectPart(it) }
         }
     }
 
@@ -156,7 +160,7 @@ class InkDeskViewModel(
         val result = assemblyEngine.attemptSnap(_assemblyState.value, partId, candidatePos, candidateYawDeg)
         _assemblyState.value = result.state
         if (result.snapped) {
-            assemblyProgress(result.state).activePartId?.let { store.selectPart(it) }
+            assemblyProgress(result.state).activePartId?.let { selectPart(it) }
         }
         return result
     }
@@ -165,7 +169,7 @@ class InkDeskViewModel(
         val result = assemblyEngine.assistSnapActiveStep(_assemblyState.value)
         _assemblyState.value = result.state
         if (result.snapped) {
-            assemblyProgress(result.state).activePartId?.let { store.selectPart(it) }
+            assemblyProgress(result.state).activePartId?.let { selectPart(it) }
         }
         return result
     }
@@ -173,7 +177,7 @@ class InkDeskViewModel(
     fun resetAssembly() {
         val next = assemblyEngine.reset(_assemblyState.value)
         _assemblyState.value = next
-        assemblyProgress(next).activePartId?.let { store.selectPart(it) }
+        assemblyProgress(next).activePartId?.let { selectPart(it) }
     }
 
     fun updateCutawayPlane(
@@ -191,7 +195,15 @@ class InkDeskViewModel(
 
     fun selectCalloutAnchor(anchorId: String): SelectAnchorResult {
         val res = anchorEngine.selectAnchor(_anchorState.value, anchorId)
-        if (res.found) {
+        if (res.found && res.anchor != null) {
+            if (res.anchor.artifactId != uiState.value.activeArtifactId) {
+                store.selectArtifact(res.anchor.artifactId)
+                val exhibit = ArtifactCatalog.findArtifact(res.anchor.artifactId)
+                _assemblyState.value = assemblyEngine.createSession(
+                    artifact = exhibit,
+                    cutaway = CutawayPlaneState(enabled = false, axis = _assemblyState.value.cutaway.axis)
+                )
+            }
             _anchorState.value = res.state
             res.partId?.let { store.selectPart(it) }
         }
@@ -222,6 +234,7 @@ class InkDeskViewModel(
         val res = anchorEngine.deleteCustomAnchor(_anchorState.value, anchorId)
         if (res.ok) {
             _anchorState.value = res.state
+            anchorEngine.selectedAnchor(res.state)?.partId?.let { store.selectPart(it) }
         }
         return res
     }
@@ -237,11 +250,22 @@ class InkDeskViewModel(
     fun selectArtifact(id: String) {
         store.selectArtifact(id)
         val exhibit = ArtifactCatalog.findArtifact(id)
-        _assemblyState.value = assemblyEngine.createSession(
+        val nextAssembly = assemblyEngine.createSession(
             artifact = exhibit,
             cutaway = CutawayPlaneState(enabled = false, axis = _assemblyState.value.cutaway.axis)
         )
-        _anchorState.value = anchorEngine.switchArtifact(_anchorState.value, exhibit.id)
+        _assemblyState.value = nextAssembly
+        val initialPartId = if (_assemblyMode.value) {
+            assemblyProgress(nextAssembly).activePartId ?: exhibit.parts.first().id
+        } else {
+            exhibit.parts.first().id
+        }
+        store.selectPart(initialPartId)
+        _anchorState.value = anchorEngine.syncSelectedAnchorToPart(
+            anchorEngine.switchArtifact(_anchorState.value, exhibit.id),
+            exhibit.id,
+            initialPartId
+        )
     }
 
     fun selectPart(partId: String) {
@@ -267,7 +291,10 @@ class InkDeskViewModel(
     fun addNote(content: String) = store.addNote(content)
     fun togglePinNote(noteId: String) = store.togglePinNote(noteId)
     fun deleteNote(noteId: String) = store.deleteNote(noteId)
-    fun exportMarkdownReport(): String = store.exportMarkdownReport()
+    fun exportMarkdownReport(): String = store.exportMarkdownReport(
+        lightingPreset = _anchorState.value.lightingPreset,
+        calloutAnchors = calloutAnchors(_anchorState.value)
+    )
 
     fun toggleFocusTimer() {
         store.toggleFocusTimer()

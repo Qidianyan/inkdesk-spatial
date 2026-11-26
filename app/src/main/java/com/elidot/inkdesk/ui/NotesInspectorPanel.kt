@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +51,12 @@ fun NotesInspectorPanel(
     val artifactNotes = state.notes.filter { it.artifactId == state.activeArtifactId }
     var draftPinTitle by remember { mutableStateOf("") }
     var draftNote by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
     var exportedPreview by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.activeArtifactId) {
+        pinError = null
+    }
 
     Surface(
         modifier = modifier
@@ -133,28 +139,33 @@ fun NotesInspectorPanel(
             ) {
                 OutlinedTextField(
                     value = draftPinTitle,
-                    onValueChange = { draftPinTitle = it },
+                    onValueChange = {
+                        draftPinTitle = it
+                        if (pinError != null) pinError = null
+                    },
                     modifier = Modifier.weight(0.9f),
                     singleLine = true,
                     placeholder = { Text("3D 批注钉标题") }
                 )
                 OutlinedTextField(
                     value = draftNote,
-                    onValueChange = { draftNote = it },
+                    onValueChange = {
+                        draftNote = it
+                        if (pinError != null) pinError = null
+                    },
                     modifier = Modifier.weight(1.1f),
                     singleLine = true,
                     placeholder = { Text("工艺/力学批注") }
                 )
                 Button(
                     onClick = {
-                        if (draftPinTitle.isNotBlank() && draftNote.isNotBlank()) {
-                            val res = viewModel.addCustomCalloutAnchor(draftPinTitle, draftNote)
-                            if (res.ok) {
-                                draftPinTitle = ""
-                                draftNote = ""
-                            }
-                        } else if (viewModel.addNote(draftNote) != null) {
+                        val res = viewModel.addCustomCalloutAnchor(draftPinTitle, draftNote)
+                        if (res.ok) {
+                            pinError = null
+                            draftPinTitle = ""
                             draftNote = ""
+                        } else {
+                            pinError = res.errorZh
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -164,6 +175,28 @@ fun NotesInspectorPanel(
                 ) {
                     Text("钉入")
                 }
+                Button(
+                    onClick = {
+                        if (viewModel.addNote(draftNote) != null) {
+                            pinError = null
+                            draftNote = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.cardSurface,
+                        contentColor = palette.primaryText
+                    )
+                ) {
+                    Text("记手记")
+                }
+            }
+            if (pinError != null) {
+                Text(
+                    text = pinError!!,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = palette.persimmonAccent
+                )
             }
 
             // Spatial Callout Anchors & Sticky Notes List
