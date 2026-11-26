@@ -16,7 +16,7 @@
 - **16 枚 3D 空间双向锚点批注钉 × 3 档纯暖建筑影棚光（`SpatialAnchorEngine.kt`）**：为 4 套文物各注册 4 枚朱砂/铜金专家构造锚点，支持 3D ↔ 面板双向推镜聚焦、跨展品自动切换、自定义空间钉增删/空白校验/防撞号与 `cameraFocus` NaN 越界钳制；内置 `京都晨光 5200K` / `美术馆顶光 4400K` / `宋代烛映 2450K` 三档无蓝紫建筑光影预设（单测锁定 `R ≥ G ≥ B`）。
 - **4 套真实二进制 glTF 2.0（`.glb`）共享 3D 资产**：打包于 `app/src/main/assets/models/`，节点层级与 `ExplodedModelController.resolveGlbSceneBinding()` 精确一一映射：
   - `yongle_dougong.glb`（658 KB，7 构件：明代永乐大钟重檐五踩斗拱榫卯）
-  - `ming_armillary.glb`（2.39 MB，6 构件：明代紫金山制式浑天仪）
+  - `ming_armillary.glb`（2.33 MB，6 构件：明代紫金山制式浑天仪）
   - `xuande_censer.glb`（911 KB，6 构件：宋韵明制桥耳宣德炉）
   - `origami_pagoda.glb`（371 KB，6 构件：空间折纸几何塔）
 
