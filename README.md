@@ -2,8 +2,8 @@
 
 > 2026 PICO 空间应用创作大赛（中国区 Space Program）· Spatial 空间应用创作赛道参赛开源作品（MIT License）
 >
-> - **1080p 工作室配音实机演示大片（YouTube）**：https://youtu.be/3Lz5gmcbS7I
-> - **12 页建筑级决赛路演 PDF Deck & 高清视频直链（Release）**：https://github.com/Qidianyan/inkdesk-spatial/releases
+> - **1080p 工作室配音实机演示大片（YouTube / Release v6.0 直链）**：https://youtu.be/3Lz5gmcbS7I ｜ [V6 1080p 终版原片下载 (Release v6.0)](https://github.com/Qidianyan/inkdesk-spatial/releases/tag/v6.0)
+> - **12 页建筑级 V6 决赛路演 PDF Deck（Release v6.0）**：https://github.com/Qidianyan/inkdesk-spatial/releases/tag/v6.0
 > - **1:1 浏览器 WebXR 交互仿真伴生仓（Three.js + HRTF）**：https://github.com/Qidianyan/inkdesk-spatial-preview
 
 ## 1. 作品亮点（V6 终版全栈能力）
