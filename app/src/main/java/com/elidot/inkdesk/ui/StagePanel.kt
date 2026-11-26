@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elidot.inkdesk.domain.CutawayAxis
+import com.elidot.inkdesk.domain.StudioLightingPreset
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.LayoutPreset
 import com.elidot.inkdesk.model.PanelId
@@ -55,6 +56,7 @@ fun StagePanel(
     val state by viewModel.uiState.collectAsState()
     val assemblyMode by viewModel.assemblyMode.collectAsState()
     val assemblyState by viewModel.assemblyState.collectAsState()
+    val anchorState by viewModel.anchorState.collectAsState()
     val assemblyProgress = viewModel.assemblyProgress(assemblyState)
     val palette = InkDeskThemeTokens.paletteFor(state.ambientTheme)
     val artifact = viewModel.activeArtifact(state)
@@ -158,6 +160,48 @@ fun StagePanel(
                             color = if (active) InkDeskThemeTokens.Alabaster else palette.primaryText
                         )
                     }
+                }
+            }
+
+            // Architectural Museum Studio Lighting 3-Preset Bar + 3D Callout Pin Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StudioLightingPreset.entries.forEach { preset ->
+                    val active = anchorState.lightingPreset == preset
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (active) palette.champagneBronze else palette.cardSurface)
+                            .clickable { viewModel.setStudioLightingPreset(preset) }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${preset.labelZh} ${preset.kelvin}K",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (active) InkDeskThemeTokens.DeepCedar else palette.primaryText
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (anchorState.showPinsIn3D) palette.bambooGreen else palette.cardSurface)
+                        .clickable { viewModel.toggleShowPinsIn3D() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (anchorState.showPinsIn3D) "锚点开" else "锚点关",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (anchorState.showPinsIn3D) InkDeskThemeTokens.Alabaster else palette.primaryText
+                    )
                 }
             }
 

@@ -43,9 +43,12 @@ fun NotesInspectorPanel(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val anchorState by viewModel.anchorState.collectAsState()
+    val calloutAnchors = viewModel.calloutAnchors(anchorState)
     val palette = InkDeskThemeTokens.paletteFor(state.ambientTheme)
     val selectedPart = viewModel.selectedPart(state)
     val artifactNotes = state.notes.filter { it.artifactId == state.activeArtifactId }
+    var draftPinTitle by remember { mutableStateOf("") }
     var draftNote by remember { mutableStateOf("") }
     var exportedPreview by remember { mutableStateOf<String?>(null) }
 
@@ -122,22 +125,35 @@ fun NotesInspectorPanel(
                 )
             }
 
-            // Add Spatial Sticky Note
+            // Bidirectional 3D Spatial Callout Anchor Composer + Sticky Note
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
+                    value = draftPinTitle,
+                    onValueChange = { draftPinTitle = it },
+                    modifier = Modifier.weight(0.9f),
+                    singleLine = true,
+                    placeholder = { Text("3D 批注钉标题") }
+                )
+                OutlinedTextField(
                     value = draftNote,
                     onValueChange = { draftNote = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1.1f),
                     singleLine = true,
-                    placeholder = { Text("为「${selectedPart.nameZh}」记一条空间批注") }
+                    placeholder = { Text("工艺/力学批注") }
                 )
                 Button(
                     onClick = {
-                        if (viewModel.addNote(draftNote) != null) {
+                        if (draftPinTitle.isNotBlank() && draftNote.isNotBlank()) {
+                            val res = viewModel.addCustomCalloutAnchor(draftPinTitle, draftNote)
+                            if (res.ok) {
+                                draftPinTitle = ""
+                                draftNote = ""
+                            }
+                        } else if (viewModel.addNote(draftNote) != null) {
                             draftNote = ""
                         }
                     },
@@ -146,15 +162,56 @@ fun NotesInspectorPanel(
                         contentColor = InkDeskThemeTokens.Alabaster
                     )
                 ) {
-                    Text("记入")
+                    Text("钉入")
                 }
             }
 
-            // Spatial Sticky Notes List
+            // Spatial Callout Anchors & Sticky Notes List
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                items(calloutAnchors, key = { it.id }) { anchor ->
+                    val isFocused = anchor.id == anchorState.selectedAnchorId
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isFocused) palette.elevatedSurface else palette.cardSurface)
+                            .border(
+                                width = if (isFocused) 1.5.dp else 0.dp,
+                                color = if (isFocused) palette.champagneBronze else palette.cardSurface,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .clickable { viewModel.selectCalloutAnchor(anchor.id) }
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${anchor.titleZh} · ${anchor.craftCategoryZh}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isFocused) palette.persimmonAccent else palette.primaryText
+                            )
+                            if (anchor.isCustom) {
+                                Text(
+                                    text = "删除",
+                                    fontSize = 11.sp,
+                                    color = palette.persimmonAccent,
+                                    modifier = Modifier.clickable { viewModel.deleteCustomCalloutAnchor(anchor.id) }
+                                )
+                            }
+                        }
+                        Text(
+                            text = if (isFocused) "${anchor.eraOrPeriodZh}\n${anchor.craftDetailZh}" else anchor.mechanicsSummaryZh,
+                            fontSize = 11.sp,
+                            color = palette.secondaryText
+                        )
+                    }
+                }
                 items(artifactNotes, key = { it.id }) { note ->
                     Column(
                         modifier = Modifier

@@ -1,11 +1,18 @@
 package com.elidot.inkdesk.ui
 
+import com.elidot.inkdesk.domain.AnchorMutationResult
+import com.elidot.inkdesk.domain.CalloutPinTone
 import com.elidot.inkdesk.domain.CutawayAxis
 import com.elidot.inkdesk.domain.CutawayPlaneState
 import com.elidot.inkdesk.domain.MortiseAssemblyEngine
 import com.elidot.inkdesk.domain.MortiseAssemblyProgress
 import com.elidot.inkdesk.domain.MortiseAssemblyState
+import com.elidot.inkdesk.domain.SelectAnchorResult
 import com.elidot.inkdesk.domain.SnapAttemptResult
+import com.elidot.inkdesk.domain.SpatialAnchorEngine
+import com.elidot.inkdesk.domain.SpatialAnchorState
+import com.elidot.inkdesk.domain.SpatialCalloutAnchor
+import com.elidot.inkdesk.domain.StudioLightingPreset
 import com.elidot.inkdesk.model.AmbientLightingTheme
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.ArtifactPart
@@ -43,6 +50,7 @@ class InkDeskViewModel(
     val explodedController: ExplodedModelController = ExplodedModelController(),
     val audioEngine: SpatialAudioEngine = SpatialAudioEngine(),
     val assemblyEngine: MortiseAssemblyEngine = MortiseAssemblyEngine(),
+    val anchorEngine: SpatialAnchorEngine = SpatialAnchorEngine(),
     val audioBridge: PicoSpatialAudioBridge = PicoSpatialAudioBridge()
 ) {
     private val store = SpatialSessionStore(audioEngine, explodedController)
@@ -59,6 +67,11 @@ class InkDeskViewModel(
         assemblyEngine.createSession(ArtifactCatalog.findArtifact(store.state.activeArtifactId))
     )
     val assemblyState: StateFlow<MortiseAssemblyState> = _assemblyState.asStateFlow()
+
+    private val _anchorState = MutableStateFlow(
+        anchorEngine.createState(store.state.activeArtifactId)
+    )
+    val anchorState: StateFlow<SpatialAnchorState> = _anchorState.asStateFlow()
 
     init {
         store.subscribe { snapshot ->
@@ -173,6 +186,54 @@ class InkDeskViewModel(
         store.setCrossSection(updated.cutaway.enabled, updated.cutaway.offsetMeters)
     }
 
+    fun calloutAnchors(state: SpatialAnchorState = anchorState.value): List<SpatialCalloutAnchor> =
+        anchorEngine.anchorsFor(state, uiState.value.activeArtifactId)
+
+    fun selectCalloutAnchor(anchorId: String): SelectAnchorResult {
+        val res = anchorEngine.selectAnchor(_anchorState.value, anchorId)
+        if (res.found) {
+            _anchorState.value = res.state
+            res.partId?.let { store.selectPart(it) }
+        }
+        return res
+    }
+
+    fun addCustomCalloutAnchor(
+        titleZh: String,
+        craftDetailZh: String,
+        tone: CalloutPinTone = CalloutPinTone.CINNABAR
+    ): AnchorMutationResult {
+        val current = uiState.value
+        val res = anchorEngine.addCustomAnchor(
+            state = _anchorState.value,
+            artifactId = current.activeArtifactId,
+            partId = current.selectedPartId,
+            titleZh = titleZh,
+            craftDetailZh = craftDetailZh,
+            tone = tone
+        )
+        if (res.ok) {
+            _anchorState.value = res.state
+        }
+        return res
+    }
+
+    fun deleteCustomCalloutAnchor(anchorId: String): AnchorMutationResult {
+        val res = anchorEngine.deleteCustomAnchor(_anchorState.value, anchorId)
+        if (res.ok) {
+            _anchorState.value = res.state
+        }
+        return res
+    }
+
+    fun setStudioLightingPreset(preset: StudioLightingPreset) {
+        _anchorState.value = anchorEngine.setLightingPreset(_anchorState.value, preset)
+    }
+
+    fun toggleShowPinsIn3D() {
+        _anchorState.value = anchorEngine.setShowPinsIn3D(_anchorState.value, !_anchorState.value.showPinsIn3D)
+    }
+
     fun selectArtifact(id: String) {
         store.selectArtifact(id)
         val exhibit = ArtifactCatalog.findArtifact(id)
@@ -180,8 +241,17 @@ class InkDeskViewModel(
             artifact = exhibit,
             cutaway = CutawayPlaneState(enabled = false, axis = _assemblyState.value.cutaway.axis)
         )
+        _anchorState.value = anchorEngine.switchArtifact(_anchorState.value, exhibit.id)
     }
-    fun selectPart(partId: String) = store.selectPart(partId)
+
+    fun selectPart(partId: String) {
+        store.selectPart(partId)
+        _anchorState.value = anchorEngine.syncSelectedAnchorToPart(
+            _anchorState.value,
+            uiState.value.activeArtifactId,
+            partId
+        )
+    }
     fun setComparePart(partId: String?) = store.setComparePart(partId)
     fun setExplodeProgress(progress: Float) = store.setExplodeProgress(progress)
     fun setCrossSection(enabled: Boolean, cutY: Float = uiState.value.sectionCutY) =
