@@ -21,6 +21,7 @@ echo "[1/3] Compiling Kotlin domain model & spatial engines..."
   -jvm-target 17 \
   -classpath "$KOTLIN_CLI_DIR/kotlin-stdlib-2.1.20.jar:$KOTLIN_CLI_DIR/kotlinx-coroutines-core-jvm-1.9.0.jar" \
   "$ROOT_DIR/app/src/main/java/com/elidot/inkdesk/model/InkDeskModels.kt" \
+  "$ROOT_DIR/app/src/main/java/com/elidot/inkdesk/domain/MortiseAssemblyEngine.kt" \
   "$ROOT_DIR/app/src/main/java/com/elidot/inkdesk/spatial/SpatialPanelLayoutEngine.kt" \
   "$ROOT_DIR/app/src/main/java/com/elidot/inkdesk/spatial/ExplodedModelController.kt" \
   "$ROOT_DIR/app/src/main/java/com/elidot/inkdesk/spatial/SpatialAudioEngine.kt" \
@@ -32,6 +33,7 @@ echo "[2/3] Compiling JUnit 4 spatial test suite..."
   -no-stdlib \
   -jvm-target 17 \
   -classpath "$BUILD_DIR/main:$KOTLIN_CLI_DIR/kotlin-stdlib-2.1.20.jar:$KOTLIN_CLI_DIR/junit-4.13.2.jar:$KOTLIN_CLI_DIR/hamcrest-core-1.3.jar" \
+  "$ROOT_DIR/app/src/test/java/com/elidot/inkdesk/domain/MortiseAssemblyEngineTest.kt" \
   "$ROOT_DIR/app/src/test/java/com/elidot/inkdesk/spatial/SpatialPanelLayoutEngineTest.kt" \
   "$ROOT_DIR/app/src/test/java/com/elidot/inkdesk/spatial/ExplodedModelControllerTest.kt" \
   "$ROOT_DIR/app/src/test/java/com/elidot/inkdesk/spatial/SpatialAudioEngineTest.kt" \
@@ -41,6 +43,7 @@ echo "[2/3] Compiling JUnit 4 spatial test suite..."
 echo "[3/3] Executing JUnit 4 tests on JDK 17..."
 "$JAVA_BIN" -cp "$BUILD_DIR/main:$BUILD_DIR/test:$KOTLIN_CLI_DIR/kotlin-stdlib-2.1.20.jar:$KOTLIN_CLI_DIR/junit-4.13.2.jar:$KOTLIN_CLI_DIR/hamcrest-core-1.3.jar" \
   org.junit.runner.JUnitCore \
+  com.elidot.inkdesk.domain.MortiseAssemblyEngineTest \
   com.elidot.inkdesk.spatial.SpatialPanelLayoutEngineTest \
   com.elidot.inkdesk.spatial.ExplodedModelControllerTest \
   com.elidot.inkdesk.spatial.SpatialAudioEngineTest \

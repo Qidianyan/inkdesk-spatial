@@ -33,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elidot.inkdesk.domain.CutawayAxis
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.LayoutPreset
 import com.elidot.inkdesk.model.PanelId
@@ -52,6 +53,9 @@ fun StagePanel(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val assemblyMode by viewModel.assemblyMode.collectAsState()
+    val assemblyState by viewModel.assemblyState.collectAsState()
+    val assemblyProgress = viewModel.assemblyProgress(assemblyState)
     val palette = InkDeskThemeTokens.paletteFor(state.ambientTheme)
     val artifact = viewModel.activeArtifact(state)
     val selectedPart = viewModel.selectedPart(state)
@@ -215,50 +219,99 @@ fun StagePanel(
                 }
             }
 
-            // Exploded View Slider & Cross-Section Controls
+            // Exploded View / Interactive Mortise Snap Assembly + Multi-Axis Cutaway Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "爆炸视图拆解进度：${(state.explodeProgress * 100).toInt()}%",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = palette.primaryText
-                    )
-                    Slider(
-                        value = state.explodeProgress,
-                        onValueChange = { viewModel.setExplodeProgress(it) },
-                        colors = SliderDefaults.colors(
-                            thumbColor = palette.persimmonAccent,
-                            activeTrackColor = palette.persimmonAccent,
-                            inactiveTrackColor = palette.borderStroke
-                        )
-                    )
-                }
-
                 Button(
-                    onClick = { viewModel.setCrossSection(!state.crossSectionEnabled) },
+                    onClick = { viewModel.setAssemblyMode(!assemblyMode) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (state.crossSectionEnabled) palette.bambooGreen else palette.cardSurface,
-                        contentColor = if (state.crossSectionEnabled) InkDeskThemeTokens.Alabaster else palette.primaryText
+                        containerColor = if (assemblyMode) palette.persimmonAccent else palette.cardSurface,
+                        contentColor = if (assemblyMode) InkDeskThemeTokens.Alabaster else palette.primaryText
                     )
                 ) {
-                    Text(if (state.crossSectionEnabled) "关闭剖面" else "剖面测量")
+                    Text(if (assemblyMode) "榫卯拼装中" else "切换榫卯拼装")
+                }
+
+                if (assemblyMode) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "榫卯磁吸进度：${assemblyProgress.lockedCount}/${assemblyProgress.totalSteps} · ${assemblyState.lastEventMessageZh}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.primaryText
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.assistSnapActivePart() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = palette.champagneBronze,
+                            contentColor = InkDeskThemeTokens.DeepCedar
+                        )
+                    ) {
+                        Text(if (assemblyProgress.isComplete) "全器已合" else "磁吸落位")
+                    }
+                    Button(
+                        onClick = { viewModel.resetAssembly() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = palette.cardSurface,
+                            contentColor = palette.primaryText
+                        )
+                    ) {
+                        Text("复位")
+                    }
+                } else {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "爆炸视图拆解进度：${(state.explodeProgress * 100).toInt()}%",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.primaryText
+                        )
+                        Slider(
+                            value = state.explodeProgress,
+                            onValueChange = { viewModel.setExplodeProgress(it) },
+                            colors = SliderDefaults.colors(
+                                thumbColor = palette.persimmonAccent,
+                                activeTrackColor = palette.persimmonAccent,
+                                inactiveTrackColor = palette.borderStroke
+                            )
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.setExplodeProgress(if (state.explodeProgress > 0.5f) 0f else 0.85f)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = palette.champagneBronze,
+                            contentColor = InkDeskThemeTokens.DeepCedar
+                        )
+                    ) {
+                        Text(if (state.explodeProgress > 0.5f) "一键合榫" else "一键全拆")
+                    }
                 }
 
                 Button(
                     onClick = {
-                        viewModel.setExplodeProgress(if (state.explodeProgress > 0.5f) 0f else 0.85f)
+                        val nextEnabled = !assemblyState.cutaway.enabled
+                        val nextAxis = if (assemblyState.cutaway.enabled) {
+                            CutawayAxis.entries[(assemblyState.cutaway.axis.ordinal + 1) % CutawayAxis.entries.size]
+                        } else {
+                            assemblyState.cutaway.axis
+                        }
+                        viewModel.updateCutawayPlane(enabled = nextEnabled, axis = nextAxis)
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = palette.champagneBronze,
-                        contentColor = InkDeskThemeTokens.DeepCedar
+                        containerColor = if (assemblyState.cutaway.enabled) palette.bambooGreen else palette.cardSurface,
+                        contentColor = if (assemblyState.cutaway.enabled) InkDeskThemeTokens.Alabaster else palette.primaryText
                     )
                 ) {
-                    Text(if (state.explodeProgress > 0.5f) "一键合榫" else "一键全拆")
+                    Text(
+                        if (assemblyState.cutaway.enabled) "剖面 ${assemblyState.cutaway.axis.name}" else "剖面切片"
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))

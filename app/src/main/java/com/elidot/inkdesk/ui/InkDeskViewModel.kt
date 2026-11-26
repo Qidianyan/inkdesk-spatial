@@ -1,5 +1,11 @@
 package com.elidot.inkdesk.ui
 
+import com.elidot.inkdesk.domain.CutawayAxis
+import com.elidot.inkdesk.domain.CutawayPlaneState
+import com.elidot.inkdesk.domain.MortiseAssemblyEngine
+import com.elidot.inkdesk.domain.MortiseAssemblyProgress
+import com.elidot.inkdesk.domain.MortiseAssemblyState
+import com.elidot.inkdesk.domain.SnapAttemptResult
 import com.elidot.inkdesk.model.AmbientLightingTheme
 import com.elidot.inkdesk.model.ArtifactCatalog
 import com.elidot.inkdesk.model.ArtifactPart
@@ -36,6 +42,7 @@ class InkDeskViewModel(
     val layoutEngine: SpatialPanelLayoutEngine = SpatialPanelLayoutEngine(),
     val explodedController: ExplodedModelController = ExplodedModelController(),
     val audioEngine: SpatialAudioEngine = SpatialAudioEngine(),
+    val assemblyEngine: MortiseAssemblyEngine = MortiseAssemblyEngine(),
     val audioBridge: PicoSpatialAudioBridge = PicoSpatialAudioBridge()
 ) {
     private val store = SpatialSessionStore(audioEngine, explodedController)
@@ -44,6 +51,14 @@ class InkDeskViewModel(
 
     private val _uiState = MutableStateFlow(store.state)
     val uiState: StateFlow<InkDeskSessionState> = _uiState.asStateFlow()
+
+    private val _assemblyMode = MutableStateFlow(false)
+    val assemblyMode: StateFlow<Boolean> = _assemblyMode.asStateFlow()
+
+    private val _assemblyState = MutableStateFlow(
+        assemblyEngine.createSession(ArtifactCatalog.findArtifact(store.state.activeArtifactId))
+    )
+    val assemblyState: StateFlow<MortiseAssemblyState> = _assemblyState.asStateFlow()
 
     init {
         store.subscribe { snapshot ->
@@ -105,7 +120,67 @@ class InkDeskViewModel(
         )
     }
 
-    fun selectArtifact(id: String) = store.selectArtifact(id)
+    fun assemblyProgress(state: MortiseAssemblyState = assemblyState.value): MortiseAssemblyProgress =
+        assemblyEngine.progressOf(state)
+
+    fun setAssemblyMode(enabled: Boolean) {
+        _assemblyMode.value = enabled
+        if (enabled) {
+            assemblyProgress().activePartId?.let { store.selectPart(it) }
+        }
+    }
+
+    fun moveAssemblyPart(partId: String, nextPos: Vec3, nextYawDeg: Float? = null) {
+        _assemblyState.value = assemblyEngine.movePart(_assemblyState.value, partId, nextPos, nextYawDeg)
+    }
+
+    fun nudgeActiveAssemblyPart(deltaPos: Vec3, deltaYawDeg: Float = 0f) {
+        val activeId = assemblyProgress().activePartId ?: return
+        _assemblyState.value = assemblyEngine.nudgePart(_assemblyState.value, activeId, deltaPos, deltaYawDeg)
+    }
+
+    fun attemptSnapAssemblyPart(partId: String, candidatePos: Vec3? = null, candidateYawDeg: Float? = null): SnapAttemptResult {
+        val result = assemblyEngine.attemptSnap(_assemblyState.value, partId, candidatePos, candidateYawDeg)
+        _assemblyState.value = result.state
+        if (result.snapped) {
+            assemblyProgress(result.state).activePartId?.let { store.selectPart(it) }
+        }
+        return result
+    }
+
+    fun assistSnapActivePart(): SnapAttemptResult {
+        val result = assemblyEngine.assistSnapActiveStep(_assemblyState.value)
+        _assemblyState.value = result.state
+        if (result.snapped) {
+            assemblyProgress(result.state).activePartId?.let { store.selectPart(it) }
+        }
+        return result
+    }
+
+    fun resetAssembly() {
+        val next = assemblyEngine.reset(_assemblyState.value)
+        _assemblyState.value = next
+        assemblyProgress(next).activePartId?.let { store.selectPart(it) }
+    }
+
+    fun updateCutawayPlane(
+        enabled: Boolean = _assemblyState.value.cutaway.enabled,
+        axis: CutawayAxis = _assemblyState.value.cutaway.axis,
+        offsetMeters: Float = _assemblyState.value.cutaway.offsetMeters
+    ) {
+        val updated = assemblyEngine.updateCutaway(_assemblyState.value, enabled, axis, offsetMeters)
+        _assemblyState.value = updated
+        store.setCrossSection(updated.cutaway.enabled, updated.cutaway.offsetMeters)
+    }
+
+    fun selectArtifact(id: String) {
+        store.selectArtifact(id)
+        val exhibit = ArtifactCatalog.findArtifact(id)
+        _assemblyState.value = assemblyEngine.createSession(
+            artifact = exhibit,
+            cutaway = CutawayPlaneState(enabled = false, axis = _assemblyState.value.cutaway.axis)
+        )
+    }
     fun selectPart(partId: String) = store.selectPart(partId)
     fun setComparePart(partId: String?) = store.setComparePart(partId)
     fun setExplodeProgress(progress: Float) = store.setExplodeProgress(progress)
